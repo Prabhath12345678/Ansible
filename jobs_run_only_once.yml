@@ -1,0 +1,30 @@
+- name: Get list of playbooks run only once
+  hosts: localhost
+  gather_facts: no
+
+  tasks:
+
+  - name: Get list of all job templates
+    tower_job_template_info:
+      tower_host: https://tower.example.com
+      validate_certs: no
+    register: job_templates
+
+  - name: Get list of job runs for each job template
+    tower_job_list:
+      tower_host: https://tower.example.com
+      validate_certs: no
+      job_template_id: "{{ item.id }}"
+    register: job_runs
+    loop: "{{ job_templates.json.results }}"
+
+  - name: Filter job runs to only include those that have been run only once
+    set_fact:
+      filtered_job_runs: "{{ job_runs.results | json_query('results[? launched=1].id') }}"
+
+  - name: Write filtered job run data to csv file
+    csvfile:
+      dest: /path/to/output.csv
+      fields:
+        - id
+      data: "{{ filtered_job_runs }}"
