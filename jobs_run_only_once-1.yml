@@ -1,0 +1,46 @@
+---
+- name: Retrieve playbooks run only once
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Fetch playbooks data
+      uri:
+        url: "https://{{ tower_host }}/api/v2/jobs/?page={{ page_number }}"
+        headers:
+          Authorization: "Bearer {{ tower_token }}"
+        return_content: yes
+      register: playbooks_data
+
+    - name: Parse playbook data
+      set_fact:
+        playbooks: "{{ playbooks + playbooks_data.json.results }}"
+
+    - name: Check if there are more pages
+      set_fact:
+        more_pages: "{{ playbooks_data.json.next is not none }}"
+
+    - name: Loop over all pages
+      loop:
+        - "{{ range(1, playbooks_data.json.count.pages + 1) }}"
+      with_sequence: start=1 end=playbooks_data.json.count.pages step=1
+      when: more_pages
+
+    - name: Filter playbooks run only once
+      set_fact:
+        playbooks_run_only_once: "{{ playbooks | json_query('[?launches==1]') }}"
+
+    - name: Create CSV file
+      local_action:
+        module: copy
+        content: |
+          Name,Job Type,Status,Start,End
+          {% for playbook in playbooks_run_only_once %}
+          {{ playbook.name }},{{ playbook.job_type }},{{ playbook.status }},{{ playbook.started }},{{ playbook.finished }}
+          {% endfor %}
+        dest: playbooks_run_only_once.csv
+
+  vars:
+    tower_host: "your_tower_hostname_or_IP_address"
+    tower_token: "your_tower_api_token"
+    playbooks: []
+    more_pages: True
