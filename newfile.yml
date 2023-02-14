@@ -1,0 +1,33 @@
+---
+- name: Pull data from all jobs that executed only once in Ansible Tower
+  hosts: localhost
+  gather_facts: false
+  vars:
+    tower_host: "https://tower.example.com"
+    tower_username: "admin"
+    tower_password: "secret"
+  tasks:
+    - name: Get the details of all jobs in Ansible Tower
+      tower_job_list:
+        tower_host: "{{ tower_host }}"
+        tower_username: "{{ tower_username }}"
+        tower_password: "{{ tower_password }}"
+      register: job_list
+
+    - name: Filter the job list to include only jobs that have executed once
+      set_fact:
+        job_list: "{{ job_list.results | select('jobs_ran==1') | list }}"
+
+    - name: Loop through the filtered job list and get the details and results of each job
+      tower_job_info:
+        tower_host: "{{ tower_host }}"
+        tower_username: "{{ tower_username }}"
+        tower_password: "{{ tower_password }}"
+        job_id: "{{ item.id }}"
+      loop: "{{ job_list }}"
+      register: job_details
+
+    - name: Display the details and results of each job
+      debug:
+        var:
+          job_details: "{{ job_details.results }}"
