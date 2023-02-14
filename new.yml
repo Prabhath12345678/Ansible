@@ -1,0 +1,45 @@
+name: Get recent jobs
+hosts: localhost
+gather_facts: no
+
+tasks:
+
+name: Retrieve access token
+uri:
+url: "https://your_ansible_tower_instance.com/api/v2/oauth/token/"
+method: POST
+body_format: form-urlencoded
+body:
+grant_type: client_credentials
+client_id: "{{ tower_client_id }}"
+client_secret: "{{ tower_client_secret }}"
+headers:
+Content-Type: "application/x-www-form-urlencoded"
+status_code: 200
+register: access_token
+
+name: Get job templates
+uri:
+url: "https://your_ansible_tower_instance.com/api/v2/job_templates/"
+method: GET
+headers:
+Authorization: "Bearer {{ access_token.json.access_token }}"
+Content-Type: "application/json"
+status_code: 200
+register: job_templates
+
+name: Filter job templates to get ones with only one run
+set_fact:
+one_run_templates: "{{ job_templates.json.results | selectattr('recent_jobs_count', '==', 1) | list }}"
+
+name: Get recent jobs for each one-run job template
+uri:
+url: "https://your_ansible_tower_instance.com/api/v2/job_templates/{{ item.id }}/recent_jobs/"
+method: GET
+headers:
+Authorization: "Bearer {{ access_token.json.access_token }}"
+Content-Type: "application/json"
+status_code: 200
+with_items:
+
+"{{ one_run_templates }}"
